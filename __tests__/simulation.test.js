@@ -2,25 +2,6 @@
  * @jest-environment jsdom
  */
 
-// Mock Leaflet
-global.L = {
-    latLng: (lat, lng) => ({ lat, lng }),
-};
-
-// Import class definitions
-const fs = require('fs');
-const path = require('path');
-const appCode = fs.readFileSync(path.join(__dirname, '../app.js'), 'utf8');
-
-// Extract and evaluate classes
-const scheduleClassMatch = appCode.match(/class Schedule \{[\s\S]*?\n\}/);
-const trainClassMatch = appCode.match(/class Train \{[\s\S]*?\n    \}\n\n    start\(\)[\s\S]*?\n    \}\n\}/);
-const simulationClassMatch = appCode.match(/class SimulationEngine \{[\s\S]*?\n    \}\n\}/);
-
-if (scheduleClassMatch) eval(scheduleClassMatch[0]);
-if (trainClassMatch) eval(trainClassMatch[0]);
-if (simulationClassMatch) eval(simulationClassMatch[0]);
-
 describe('SimulationEngine Class', () => {
     let mockRailwayManager;
     let simulationEngine;
@@ -42,10 +23,6 @@ describe('SimulationEngine Class', () => {
         };
 
         simulationEngine = new SimulationEngine(mockRailwayManager);
-
-        // Mock requestAnimationFrame
-        global.requestAnimationFrame = jest.fn(cb => setTimeout(cb, 16));
-        global.cancelAnimationFrame = jest.fn(id => clearTimeout(id));
     });
 
     afterEach(() => {
@@ -140,6 +117,9 @@ describe('SimulationEngine Class', () => {
     describe('Update Loop', () => {
         beforeEach(() => {
             jest.useFakeTimers();
+            // Re-mock after jest.useFakeTimers()
+            global.requestAnimationFrame = jest.fn(cb => setTimeout(cb, 16));
+            global.cancelAnimationFrame = jest.fn(id => clearTimeout(id));
         });
 
         afterEach(() => {
@@ -206,6 +186,11 @@ describe('SimulationEngine Class', () => {
     });
 
     describe('Multiple Trains', () => {
+        beforeEach(() => {
+            // Re-mock for this test
+            global.requestAnimationFrame = jest.fn(cb => setTimeout(cb, 16));
+        });
+
         test('should update all trains in the system', () => {
             const train2 = new Train(2, 'Train 2');
             train2.line = mockTrain.line;

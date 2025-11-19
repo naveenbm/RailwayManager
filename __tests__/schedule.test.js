@@ -2,13 +2,6 @@
  * @jest-environment jsdom
  */
 
-// Import class definition
-const fs = require('fs');
-const path = require('path');
-const appCode = fs.readFileSync(path.join(__dirname, '../app.js'), 'utf8');
-const scheduleClassMatch = appCode.match(/class Schedule \{[\s\S]*?\n\}/);
-if (scheduleClassMatch) eval(scheduleClassMatch[0]);
-
 describe('Schedule Class', () => {
     let mockLine;
     let mockStops;

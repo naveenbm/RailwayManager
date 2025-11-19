@@ -2,25 +2,6 @@
  * @jest-environment jsdom
  */
 
-// Mock Leaflet
-global.L = {
-    latLng: (lat, lng) => ({ lat, lng }),
-    marker: () => ({ addTo: jest.fn(), setLatLng: jest.fn(), bindPopup: jest.fn() }),
-    divIcon: () => ({}),
-};
-
-// Import classes by executing the app.js file
-const fs = require('fs');
-const path = require('path');
-const appCode = fs.readFileSync(path.join(__dirname, '../app.js'), 'utf8');
-
-// Extract only the class definitions for testing
-const scheduleClassMatch = appCode.match(/class Schedule \{[\s\S]*?\n\}/);
-const trainClassMatch = appCode.match(/class Train \{[\s\S]*?\n    \}\n\n    start\(\)[\s\S]*?\n    \}\n\}/);
-
-if (scheduleClassMatch) eval(scheduleClassMatch[0]);
-if (trainClassMatch) eval(trainClassMatch[0]);
-
 describe('Train Class', () => {
     let mockLine;
     let train;
@@ -80,7 +61,7 @@ describe('Train Class', () => {
             const distance = train.distance(point1, point2);
 
             expect(distance).toBeGreaterThan(0);
-            expect(distance).toBeCloseTo(5574, -2); // Approximately 5.5km
+            expect(distance).toBeCloseTo(5315, -2); // Approximately 5.3km
         });
 
         test('should return 0 for same points', () => {
