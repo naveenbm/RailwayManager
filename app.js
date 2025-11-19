@@ -804,8 +804,8 @@ class RailwayManager {
         this.trains.forEach(train => {
             if (train.status !== 'running' || !train.schedule) return;
 
-            // Check if train is near a scheduled stop
-            train.schedule.stops.forEach(stop => {
+            // Check if train is near any stop (not just scheduled stops)
+            this.stops.forEach(stop => {
                 const distanceToStop = train.distance(train.currentPosition, stop.coordinates);
 
                 // If within 50 meters of stop
