@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Railway Manager - Phase 1</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <!-- Leaflet Draw CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Railway Manager</h1>
+            <div class="controls">
+                <button id="drawLineBtn" class="btn btn-primary">Draw Railway Line</button>
+                <button id="addStopBtn" class="btn btn-secondary">Add Stop</button>
+                <button id="editModeBtn" class="btn btn-warning">Edit Mode</button>
+                <button id="clearBtn" class="btn btn-danger">Clear All</button>
+            </div>
+        </header>
+
+        <div id="map"></div>
+
+        <aside class="sidebar">
+            <h2>Railway Lines</h2>
+            <div id="linesList"></div>
+
+            <h2>Stops</h2>
+            <div id="stopsList"></div>
+        </aside>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Leaflet Draw JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+
+    <script src="app.js"></script>
+</body>
+</html>

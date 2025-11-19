@@ -1,0 +1,175 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.container {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    grid-template-rows: auto 1fr;
+    height: 100vh;
+}
+
+header {
+    grid-column: 1 / -1;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 1rem 2rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+header h1 {
+    font-size: 1.8rem;
+    margin-bottom: 0.8rem;
+}
+
+.controls {
+    display: flex;
+    gap: 0.8rem;
+}
+
+.btn {
+    padding: 0.6rem 1.2rem;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.btn-primary {
+    background: #4CAF50;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #45a049;
+}
+
+.btn-secondary {
+    background: #2196F3;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #0b7dda;
+}
+
+.btn-warning {
+    background: #FF9800;
+    color: white;
+}
+
+.btn-warning:hover {
+    background: #F57C00;
+}
+
+.btn-warning.active {
+    background: #FFC107;
+    box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.3);
+}
+
+.btn-danger {
+    background: #f44336;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #da190b;
+}
+
+#map {
+    grid-column: 1;
+    grid-row: 2;
+    height: 100%;
+    width: 100%;
+}
+
+.sidebar {
+    grid-column: 2;
+    grid-row: 2;
+    background: #f5f5f5;
+    padding: 1.5rem;
+    overflow-y: auto;
+    border-left: 1px solid #ddd;
+}
+
+.sidebar h2 {
+    font-size: 1.2rem;
+    margin-bottom: 1rem;
+    color: #333;
+    border-bottom: 2px solid #667eea;
+    padding-bottom: 0.5rem;
+}
+
+#linesList, #stopsList {
+    margin-bottom: 2rem;
+}
+
+.line-item, .stop-item {
+    background: white;
+    padding: 0.8rem;
+    margin-bottom: 0.6rem;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.line-item:hover, .stop-item:hover {
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    transform: translateX(2px);
+}
+
+.line-item h3, .stop-item h3 {
+    font-size: 1rem;
+    margin-bottom: 0.3rem;
+    color: #667eea;
+}
+
+.line-item p, .stop-item p {
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.color-indicator {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border-radius: 3px;
+    margin-right: 0.5rem;
+    vertical-align: middle;
+}
+
+.empty-state {
+    text-align: center;
+    color: #999;
+    padding: 2rem 0;
+    font-style: italic;
+}
+
+/* Custom Leaflet Draw Styles */
+.leaflet-draw-actions a {
+    background-color: #fff;
+    border: 2px solid #ccc;
+    padding: 4px 8px;
+    text-decoration: none;
+    color: #333;
+}
+
+.leaflet-draw-actions a:hover {
+    background-color: #f4f4f4;
+}
