@@ -1,16 +1,208 @@
 // Railway Manager - Main Application Logic
 
+// ==================== Schedule Class ====================
+class Schedule {
+    constructor(line, stops = []) {
+        this.line = line; // Reference to line object
+        this.stops = stops; // Array of stop objects this train will visit
+        this.departureTime = null; // Optional: scheduled departure time
+        this.frequency = null; // Optional: how often train runs (in minutes)
+    }
+
+    hasStop(stopId) {
+        return this.stops.some(stop => stop.id === stopId);
+    }
+}
+
+// ==================== Train Class ====================
+class Train {
+    constructor(id, name, line = null) {
+        this.id = id;
+        this.name = name;
+        this.line = line; // Reference to line object (optional)
+        this.schedule = null; // Schedule object with route and stops
+        this.progress = 0; // 0 to 1, position along the line
+        this.speed = 0.01; // Base speed per update (adjustable)
+        this.direction = 1; // 1 for forward, -1 for backward
+        this.status = 'stopped'; // 'stopped', 'running', or 'unscheduled'
+        this.marker = null; // Leaflet marker for visual representation
+        this.currentPosition = null; // LatLng object
+    }
+
+    update(deltaTime, simulationSpeed) {
+        if (this.status !== 'running' || !this.line) return;
+
+        // Move the train along the line
+        const adjustedSpeed = this.speed * deltaTime * simulationSpeed;
+        this.progress += adjustedSpeed * this.direction;
+
+        // Handle reaching end of line (reverse direction)
+        if (this.progress >= 1) {
+            this.progress = 1;
+            this.direction = -1;
+        } else if (this.progress <= 0) {
+            this.progress = 0;
+            this.direction = 1;
+        }
+
+        // Update position on map
+        this.updatePosition();
+    }
+
+    updatePosition() {
+        if (!this.line || !this.line.layer) return;
+
+        const coordinates = this.line.coordinates;
+        if (coordinates.length < 2) return;
+
+        // Calculate position along the polyline
+        const position = this.getPositionAlongLine(coordinates, this.progress);
+        this.currentPosition = position;
+
+        // Update marker position
+        if (this.marker) {
+            this.marker.setLatLng(position);
+        }
+    }
+
+    getPositionAlongLine(coords, progress) {
+        // Calculate total length of the line
+        let totalLength = 0;
+        const segments = [];
+
+        for (let i = 0; i < coords.length - 1; i++) {
+            const from = coords[i];
+            const to = coords[i + 1];
+            const segmentLength = this.distance(from, to);
+            segments.push({ from, to, length: segmentLength });
+            totalLength += segmentLength;
+        }
+
+        // Find the segment and position within it
+        const targetDistance = totalLength * progress;
+        let accumulatedDistance = 0;
+
+        for (const segment of segments) {
+            if (accumulatedDistance + segment.length >= targetDistance) {
+                const segmentProgress = (targetDistance - accumulatedDistance) / segment.length;
+                return this.interpolate(segment.from, segment.to, segmentProgress);
+            }
+            accumulatedDistance += segment.length;
+        }
+
+        // Return last point if something goes wrong
+        return coords[coords.length - 1];
+    }
+
+    distance(point1, point2) {
+        const lat1 = point1.lat;
+        const lon1 = point1.lng;
+        const lat2 = point2.lat;
+        const lon2 = point2.lng;
+
+        const R = 6371e3; // Earth radius in meters
+        const φ1 = lat1 * Math.PI / 180;
+        const φ2 = lat2 * Math.PI / 180;
+        const Δφ = (lat2 - lat1) * Math.PI / 180;
+        const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+        const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        return R * c;
+    }
+
+    interpolate(point1, point2, progress) {
+        return L.latLng(
+            point1.lat + (point2.lat - point1.lat) * progress,
+            point1.lng + (point2.lng - point1.lng) * progress
+        );
+    }
+
+    start() {
+        this.status = 'running';
+    }
+
+    stop() {
+        this.status = 'stopped';
+    }
+}
+
+// ==================== Simulation Engine ====================
+class SimulationEngine {
+    constructor(railwayManager) {
+        this.railwayManager = railwayManager;
+        this.isRunning = false;
+        this.simulationSpeed = 1;
+        this.simulationTime = 0; // in seconds
+        this.lastUpdateTime = 0;
+        this.animationFrameId = null;
+    }
+
+    start() {
+        if (this.isRunning) return;
+        this.isRunning = true;
+        this.lastUpdateTime = Date.now();
+        this.update();
+    }
+
+    pause() {
+        this.isRunning = false;
+        if (this.animationFrameId) {
+            cancelAnimationFrame(this.animationFrameId);
+            this.animationFrameId = null;
+        }
+    }
+
+    update() {
+        if (!this.isRunning) return;
+
+        const now = Date.now();
+        const deltaTime = (now - this.lastUpdateTime) / 1000; // in seconds
+        this.lastUpdateTime = now;
+
+        // Update simulation time
+        this.simulationTime += deltaTime * this.simulationSpeed;
+
+        // Update all trains
+        this.railwayManager.trains.forEach(train => {
+            train.update(deltaTime, this.simulationSpeed);
+        });
+
+        // Update UI
+        this.railwayManager.updateSimulationUI();
+
+        // Schedule next update
+        this.animationFrameId = requestAnimationFrame(() => this.update());
+    }
+
+    setSpeed(speed) {
+        this.simulationSpeed = speed;
+    }
+
+    reset() {
+        this.pause();
+        this.simulationTime = 0;
+        this.railwayManager.updateSimulationUI();
+    }
+}
+
+// ==================== Railway Manager ====================
 class RailwayManager {
     constructor() {
         this.map = null;
         this.drawnItems = null;
         this.lines = [];
         this.stops = [];
+        this.trains = [];
         this.currentMode = null;
         this.editMode = false;
         this.editHandler = null;
         this.lineColors = ['#FF0000', '#0000FF', '#00FF00', '#FF00FF', '#FFA500', '#00FFFF'];
         this.colorIndex = 0;
+        this.simulationEngine = null;
 
         this.init();
     }
@@ -19,6 +211,8 @@ class RailwayManager {
         this.initMap();
         this.setupDrawControls();
         this.setupEventListeners();
+        this.simulationEngine = new SimulationEngine(this);
+        this.updateUI();
     }
 
     initMap() {
@@ -79,6 +273,23 @@ class RailwayManager {
         document.getElementById('addStopBtn').addEventListener('click', () => this.startAddingStop());
         document.getElementById('editModeBtn').addEventListener('click', () => this.toggleEditMode());
         document.getElementById('clearBtn').addEventListener('click', () => this.clearAll());
+
+        // Simulation controls
+        document.getElementById('playPauseBtn').addEventListener('click', () => this.toggleSimulation());
+        document.getElementById('addTrainBtn').addEventListener('click', () => this.addTrain());
+        document.getElementById('scheduleTrainBtn').addEventListener('click', () => this.scheduleTrain());
+
+        // Speed controls
+        document.querySelectorAll('.btn-speed').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const speed = parseInt(e.target.dataset.speed);
+                this.setSimulationSpeed(speed);
+
+                // Update active state
+                document.querySelectorAll('.btn-speed').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+            });
+        });
     }
 
     getNextColor() {
@@ -194,6 +405,9 @@ class RailwayManager {
                 this.editHandler = null;
             }
         }
+
+        // Update UI to show/hide delete buttons
+        this.updateUI();
     }
 
     addLine(layer) {
@@ -257,8 +471,20 @@ class RailwayManager {
     }
 
     updateUI() {
+        this.updateTrainsList();
         this.updateLinesList();
         this.updateStopsList();
+    }
+
+    updateSimulationUI() {
+        // Update time display
+        const hours = Math.floor(this.simulationEngine.simulationTime / 3600);
+        const minutes = Math.floor((this.simulationEngine.simulationTime % 3600) / 60);
+        document.getElementById('simTime').textContent =
+            `Time: ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+
+        // Update trains list
+        this.updateTrainsList();
     }
 
     updateLinesList() {
@@ -320,12 +546,257 @@ class RailwayManager {
         });
     }
 
+    updateTrainsList() {
+        const trainsList = document.getElementById('trainsList');
+
+        if (this.trains.length === 0) {
+            trainsList.innerHTML = '<div class="empty-state">No trains yet. Add a train to start simulation.</div>';
+            return;
+        }
+
+        trainsList.innerHTML = this.trains.map(train => {
+            const scheduleInfo = train.schedule
+                ? `${train.schedule.stops.length} stops`
+                : 'No schedule';
+            const progressDisplay = train.status !== 'unscheduled'
+                ? `<p>Progress: ${(train.progress * 100).toFixed(0)}%</p>`
+                : '';
+
+            return `
+                <div class="train-item" data-id="${train.id}">
+                    <div class="train-item-content">
+                        <h3>${train.name}</h3>
+                        <p>Line: ${train.line ? train.line.name : 'Not assigned'}</p>
+                        <p>Schedule: ${scheduleInfo}</p>
+                        ${progressDisplay}
+                        <span class="status ${train.status}">${train.status}</span>
+                    </div>
+                    ${this.editMode ? '<button class="delete-train-btn">×</button>' : ''}
+                </div>
+            `;
+        }).join('');
+
+        // Add click handlers to zoom to trains
+        document.querySelectorAll('.train-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                // Don't zoom if clicking delete button
+                if (e.target.classList.contains('delete-train-btn')) {
+                    return;
+                }
+
+                const trainId = parseInt(e.currentTarget.dataset.id);
+                const train = this.trains.find(t => t.id === trainId);
+                if (train && train.currentPosition) {
+                    this.map.setView(train.currentPosition, 15);
+                    if (train.marker) {
+                        train.marker.openPopup();
+                    }
+                }
+            });
+        });
+
+        // Add delete button handlers
+        if (this.editMode) {
+            document.querySelectorAll('.delete-train-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const trainId = parseInt(e.target.closest('.train-item').dataset.id);
+                    this.deleteTrain(trainId);
+                });
+            });
+        }
+    }
+
+    toggleSimulation() {
+        const btn = document.getElementById('playPauseBtn');
+
+        if (this.simulationEngine.isRunning) {
+            this.simulationEngine.pause();
+            btn.innerHTML = '▶ Play';
+            btn.classList.remove('paused');
+
+            // Stop all scheduled trains
+            this.trains.forEach(train => {
+                if (train.status !== 'unscheduled') {
+                    train.stop();
+                }
+            });
+        } else {
+            this.simulationEngine.start();
+            btn.innerHTML = '⏸ Pause';
+            btn.classList.add('paused');
+
+            // Start only scheduled trains (those with lines and schedules)
+            this.trains.forEach(train => {
+                if (train.line && train.status !== 'unscheduled') {
+                    train.start();
+                }
+            });
+        }
+    }
+
+    addTrain() {
+        const trainNumber = this.trains.length + 1;
+        const trainName = prompt('Enter train name:', `Train ${trainNumber}`);
+
+        if (!trainName) return;
+
+        // Create train without line assignment
+        const train = new Train(Date.now(), trainName);
+        train.status = 'unscheduled';
+
+        this.trains.push(train);
+        this.updateUI();
+    }
+
+    scheduleTrain() {
+        // Check if there are trains to schedule
+        if (this.trains.length === 0) {
+            alert('Please add a train first!');
+            return;
+        }
+
+        // Check if there are lines
+        if (this.lines.length === 0) {
+            alert('Please create at least one railway line first!');
+            return;
+        }
+
+        // Step 1: Select train
+        const trainNames = this.trains.map((train, index) =>
+            `${index + 1}. ${train.name} ${train.status === 'unscheduled' ? '(Unscheduled)' : ''}`
+        ).join('\n');
+        const trainIndex = prompt(`Select a train to schedule:\n${trainNames}\n\nEnter train number:`);
+
+        if (!trainIndex) return;
+
+        const selectedTrain = this.trains[parseInt(trainIndex) - 1];
+        if (!selectedTrain) {
+            alert('Invalid train selection!');
+            return;
+        }
+
+        // Step 2: Select line
+        const lineNames = this.lines.map((line, index) => `${index + 1}. ${line.name}`).join('\n');
+        const lineIndex = prompt(`Select a line for ${selectedTrain.name}:\n${lineNames}\n\nEnter line number:`);
+
+        if (!lineIndex) return;
+
+        const selectedLine = this.lines[parseInt(lineIndex) - 1];
+        if (!selectedLine) {
+            alert('Invalid line selection!');
+            return;
+        }
+
+        // Step 3: Select stops (optional)
+        let selectedStops = [];
+        if (this.stops.length > 0) {
+            // Filter stops that are near the selected line
+            const availableStops = this.stops; // In future, could filter by proximity to line
+
+            if (availableStops.length > 0) {
+                const stopNames = availableStops.map((stop, index) =>
+                    `${index + 1}. ${stop.name}`
+                ).join('\n');
+                const stopIndices = prompt(
+                    `Select stops for ${selectedTrain.name} (comma-separated numbers, or leave empty for no stops):\n${stopNames}\n\nExample: 1,3,5`
+                );
+
+                if (stopIndices && stopIndices.trim()) {
+                    const indices = stopIndices.split(',').map(s => parseInt(s.trim()) - 1);
+                    selectedStops = indices
+                        .filter(i => i >= 0 && i < availableStops.length)
+                        .map(i => availableStops[i]);
+                }
+            }
+        }
+
+        // Create schedule
+        const schedule = new Schedule(selectedLine, selectedStops);
+        selectedTrain.schedule = schedule;
+        selectedTrain.line = selectedLine;
+        selectedTrain.status = 'stopped';
+
+        // Create visual marker for train
+        if (!selectedTrain.marker) {
+            selectedTrain.marker = this.createTrainMarker(selectedTrain);
+            selectedTrain.marker.addTo(this.map);
+        }
+
+        // Initialize position
+        selectedTrain.updatePosition();
+
+        // If simulation is running, start the train
+        if (this.simulationEngine.isRunning) {
+            selectedTrain.start();
+        }
+
+        this.updateUI();
+        alert(`${selectedTrain.name} scheduled on ${selectedLine.name}${selectedStops.length > 0 ? ` with ${selectedStops.length} stops` : ''}!`);
+    }
+
+    createTrainMarker(train) {
+        // Create a custom icon for the train
+        const trainIcon = L.divIcon({
+            className: 'train-marker',
+            html: `<div style="background-color: ${train.line.color}; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"></div>`,
+            iconSize: [16, 16],
+            iconAnchor: [8, 8]
+        });
+
+        const marker = L.marker([0, 0], { icon: trainIcon });
+        marker.bindPopup(`<b>${train.name}</b><br>Line: ${train.line.name}`);
+
+        return marker;
+    }
+
+    setSimulationSpeed(speed) {
+        this.simulationEngine.setSpeed(speed);
+    }
+
+    deleteTrain(trainId) {
+        const train = this.trains.find(t => t.id === trainId);
+        if (!train) return;
+
+        if (confirm(`Delete ${train.name}?`)) {
+            // Remove marker from map
+            if (train.marker) {
+                this.map.removeLayer(train.marker);
+            }
+
+            // Remove from trains array
+            this.trains = this.trains.filter(t => t.id !== trainId);
+
+            this.updateUI();
+        }
+    }
+
     clearAll() {
-        if (confirm('Are you sure you want to clear all lines and stops?')) {
+        if (confirm('Are you sure you want to clear all lines, stops, and trains?')) {
+            // Stop simulation
+            this.simulationEngine.pause();
+
+            // Remove all train markers
+            this.trains.forEach(train => {
+                if (train.marker) {
+                    this.map.removeLayer(train.marker);
+                }
+            });
+
             this.drawnItems.clearLayers();
             this.lines = [];
             this.stops = [];
+            this.trains = [];
             this.colorIndex = 0;
+
+            // Reset simulation
+            this.simulationEngine.reset();
+
+            // Reset play button
+            const btn = document.getElementById('playPauseBtn');
+            btn.innerHTML = '▶ Play';
+            btn.classList.remove('paused');
+
             this.updateUI();
         }
     }

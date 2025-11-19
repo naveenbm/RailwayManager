@@ -33,6 +33,7 @@ header h1 {
 .controls {
     display: flex;
     gap: 0.8rem;
+    margin-bottom: 1rem;
 }
 
 .btn {
@@ -89,6 +90,54 @@ header h1 {
 
 .btn-danger:hover {
     background: #da190b;
+}
+
+.btn-success {
+    background: #4CAF50;
+    color: white;
+}
+
+.btn-success:hover {
+    background: #45a049;
+}
+
+.btn-success.paused {
+    background: #FF9800;
+}
+
+.btn-info {
+    background: #00BCD4;
+    color: white;
+}
+
+.btn-info:hover {
+    background: #00ACC1;
+}
+
+.btn-schedule {
+    background: #9C27B0;
+    color: white;
+}
+
+.btn-schedule:hover {
+    background: #7B1FA2;
+}
+
+.btn-speed {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
+}
+
+.btn-speed:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.btn-speed.active {
+    background: rgba(255, 255, 255, 0.9);
+    color: #667eea;
+    font-weight: bold;
 }
 
 #map {
@@ -159,6 +208,117 @@ header h1 {
     color: #999;
     padding: 2rem 0;
     font-style: italic;
+}
+
+/* Simulation Controls */
+.simulation-controls {
+    display: flex;
+    gap: 2rem;
+    align-items: center;
+    padding-top: 0.8rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.sim-section {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.sim-section label {
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.time-display {
+    margin-left: auto;
+    font-size: 1.1rem;
+    font-weight: 600;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+}
+
+/* Train Items */
+.train-item {
+    background: white;
+    padding: 0.8rem;
+    margin-bottom: 0.6rem;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.train-item:hover {
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    transform: translateX(2px);
+}
+
+.train-item-content {
+    flex: 1;
+}
+
+.train-item h3 {
+    font-size: 1rem;
+    margin-bottom: 0.3rem;
+    color: #00BCD4;
+}
+
+.train-item p {
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.train-item .status {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-top: 0.3rem;
+}
+
+.train-item .status.running {
+    background: #4CAF50;
+    color: white;
+}
+
+.train-item .status.stopped {
+    background: #9E9E9E;
+    color: white;
+}
+
+.train-item .status.unscheduled {
+    background: #FF9800;
+    color: white;
+}
+
+.delete-train-btn {
+    background: #f44336;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    font-size: 1.4rem;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    margin-left: 0.5rem;
+}
+
+.delete-train-btn:hover {
+    background: #da190b;
+    transform: scale(1.1);
 }
 
 /* Custom Leaflet Draw Styles */
