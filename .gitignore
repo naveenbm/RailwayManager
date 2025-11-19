@@ -10,3 +10,14 @@
 
 # Logs
 *.log
+
+# Dependencies
+node_modules/
+package-lock.json
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Jest
+jest.config.js
