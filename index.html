@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Railway Manager - Phase 2</title>
+    <title>Railway Manager - Phase 3</title>
 
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -44,6 +44,26 @@
         <div id="map"></div>
 
         <aside class="sidebar">
+            <h2>Budget</h2>
+            <div class="budget-panel">
+                <div class="budget-row">
+                    <span>Balance:</span>
+                    <span id="money" class="positive">$50000.00</span>
+                </div>
+                <div class="budget-row">
+                    <span>Revenue:</span>
+                    <span id="totalRevenue">$0.00</span>
+                </div>
+                <div class="budget-row">
+                    <span>Costs:</span>
+                    <span id="totalCosts">$0.00</span>
+                </div>
+                <div class="budget-row">
+                    <span>Profit:</span>
+                    <span id="profit" class="positive">$0.00</span>
+                </div>
+            </div>
+
             <h2>Trains</h2>
             <div id="trainsList"></div>
 

@@ -1,5 +1,65 @@
 // Railway Manager - Main Application Logic
 
+// ==================== Passenger Class ====================
+class Passenger {
+    constructor(id, origin, destination) {
+        this.id = id;
+        this.origin = origin; // Stop object
+        this.destination = destination; // Stop object
+        this.boardedTrain = null;
+        this.status = 'waiting'; // 'waiting', 'traveling', 'delivered'
+        this.waitTime = 0; // seconds
+        this.tripStartTime = null;
+    }
+
+    board(train) {
+        this.boardedTrain = train;
+        this.status = 'traveling';
+        this.tripStartTime = Date.now();
+    }
+
+    alight() {
+        this.status = 'delivered';
+        this.boardedTrain = null;
+    }
+}
+
+// ==================== Economic System ====================
+class EconomicSystem {
+    constructor(startingMoney = 50000) {
+        this.money = startingMoney;
+        this.totalRevenue = 0;
+        this.totalCosts = 0;
+        this.baseFare = 5; // Base fare per passenger
+        this.farePerKm = 0.10; // Additional fare per km
+        this.trainOperatingCostPerSec = 0.05; // Cost per second per train
+        this.lineMaintenanceCostPerSec = 0.02; // Cost per second per line
+    }
+
+    earnRevenue(amount, reason = 'passenger') {
+        this.money += amount;
+        this.totalRevenue += amount;
+    }
+
+    spendMoney(amount, reason = 'operating') {
+        this.money -= amount;
+        this.totalCosts += amount;
+        return this.money >= 0; // Return true if still solvent
+    }
+
+    calculatePassengerFare(distance) {
+        return this.baseFare + (distance / 1000) * this.farePerKm;
+    }
+
+    getBalance() {
+        return this.money;
+    }
+
+    getProfit() {
+        return this.totalRevenue - this.totalCosts;
+    }
+}
+
 // ==================== Schedule Class ====================
 class Schedule {
     constructor(line, stops = []) {
@@ -27,6 +87,11 @@ class Train {
         this.status = 'stopped'; // 'stopped', 'running', or 'unscheduled'
         this.marker = null; // Leaflet marker for visual representation
         this.currentPosition = null; // LatLng object
+
+        // Phase 3: Passenger capacity
+        this.capacity = 100; // Maximum passengers
+        this.passengers = []; // Current passengers on board
+        this.totalPassengersDelivered = 0;
     }
 
     update(deltaTime, simulationSpeed) {
@@ -121,6 +186,40 @@ class Train {
         );
     }
 
+    // Phase 3: Passenger management
+    boardPassengers(passengers) {
+        const availableSpace = this.capacity - this.passengers.length;
+        const toBoard = passengers.slice(0, availableSpace);
+
+        toBoard.forEach(passenger => {
+            passenger.board(this);
+            this.passengers.push(passenger);
+        });
+
+        return toBoard;
+    }
+
+    alightPassengers(stop) {
+        const alighting = this.passengers.filter(p => p.destination.id === stop.id);
+
+        alighting.forEach(passenger => {
+            passenger.alight();
+            this.totalPassengersDelivered++;
+        });
+
+        this.passengers = this.passengers.filter(p => p.destination.id !== stop.id);
+
+        return alighting;
+    }
+
+    getOccupancy() {
+        return this.passengers.length;
+    }
+
+    getOccupancyPercent() {
+        return (this.passengers.length / this.capacity) * 100;
+    }
+
     start() {
         this.status = 'running';
     }
@@ -139,12 +238,14 @@ class SimulationEngine {
         this.simulationTime = 0; // in seconds
         this.lastUpdateTime = 0;
         this.animationFrameId = null;
+        this.lastCostUpdate = 0; // Track when costs were last applied
     }
 
     start() {
         if (this.isRunning) return;
         this.isRunning = true;
         this.lastUpdateTime = Date.now();
+        this.lastCostUpdate = this.simulationTime;
         this.update();
     }
 
@@ -171,6 +272,18 @@ class SimulationEngine {
             train.update(deltaTime, this.simulationSpeed);
         });
 
+        // Phase 3: Update economic system (costs every second)
+        if (this.simulationTime - this.lastCostUpdate >= 1) {
+            this.railwayManager.updateEconomics(this.simulationTime - this.lastCostUpdate);
+            this.lastCostUpdate = this.simulationTime;
+        }
+
+        // Phase 3: Generate passengers periodically
+        this.railwayManager.updatePassengerGeneration(deltaTime);
+
+        // Phase 3: Handle boarding/alighting at stops
+        this.railwayManager.updatePassengerBoarding();
+
         // Update UI
         this.railwayManager.updateSimulationUI();
 
@@ -185,6 +298,7 @@ class SimulationEngine {
     reset() {
         this.pause();
         this.simulationTime = 0;
+        this.lastCostUpdate = 0;
         this.railwayManager.updateSimulationUI();
     }
 }
@@ -203,6 +317,12 @@ class RailwayManager {
         this.lineColors = ['#FF0000', '#0000FF', '#00FF00', '#FF00FF', '#FFA500', '#00FFFF'];
         this.colorIndex = 0;
         this.simulationEngine = null;
+
+        // Phase 3: Economic system
+        this.economicSystem = new EconomicSystem(50000);
+        this.passengers = [];
+        this.nextPassengerId = 1;
+        this.passengerGenerationRate = 2; // seconds between passenger spawns per stop
 
         this.init();
     }
@@ -449,7 +569,9 @@ class RailwayManager {
             id: Date.now(),
             name: stopName,
             layer: layer,
-            coordinates: layer.getLatLng()
+            coordinates: layer.getLatLng(),
+            waitingPassengers: [], // Phase 3: passengers waiting at this stop
+            lastPassengerSpawn: 0
         };
 
         this.stops.push(stop);
@@ -474,6 +596,7 @@ class RailwayManager {
         this.updateTrainsList();
         this.updateLinesList();
         this.updateStopsList();
+        this.updateBudgetDisplay(); // Phase 3
     }
 
     updateSimulationUI() {
@@ -485,6 +608,79 @@ class RailwayManager {
 
         // Update trains list
         this.updateTrainsList();
+
+        // Phase 3: Update budget display
+        this.updateBudgetDisplay();
+
+        // Phase 3: Update stop passenger counts
+        this.updateStopPassengerCounts();
+    }
+
+    updateTrainsList() {
+        const trainsList = document.getElementById('trainsList');
+
+        if (this.trains.length === 0) {
+            trainsList.innerHTML = '<div class="empty-state">No trains yet. Add a train to start simulation.</div>';
+            return;
+        }
+
+        trainsList.innerHTML = this.trains.map(train => {
+            const scheduleInfo = train.schedule
+                ? `${train.schedule.stops.length} stops`
+                : 'No schedule';
+            const progressDisplay = train.status !== 'unscheduled'
+                ? `<p>Progress: ${(train.progress * 100).toFixed(0)}%</p>`
+                : '';
+
+            // Phase 3: Show passenger count
+            const passengerInfo = train.status !== 'unscheduled'
+                ? `<p>Passengers: ${train.getOccupancy()}/${train.capacity} (${train.getOccupancyPercent().toFixed(0)}%)</p>`
+                : '';
+
+            return `
+                <div class="train-item" data-id="${train.id}">
+                    <div class="train-item-content">
+                        <h3>${train.name}</h3>
+                        <p>Line: ${train.line ? train.line.name : 'Not assigned'}</p>
+                        <p>Schedule: ${scheduleInfo}</p>
+                        ${progressDisplay}
+                        ${passengerInfo}
+                        <span class="status ${train.status}">${train.status}</span>
+                    </div>
+                    ${this.editMode ? '<button class="delete-train-btn">×</button>' : ''}
+                </div>
+            `;
+        }).join('');
+
+        // Add click handlers to zoom to trains
+        document.querySelectorAll('.train-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                // Don't zoom if clicking delete button
+                if (e.target.classList.contains('delete-train-btn')) {
+                    return;
+                }
+
+                const trainId = parseInt(e.currentTarget.dataset.id);
+                const train = this.trains.find(t => t.id === trainId);
+                if (train && train.currentPosition) {
+                    this.map.setView(train.currentPosition, 15);
+                    if (train.marker) {
+                        train.marker.openPopup();
+                    }
+                }
+            });
+        });
+
+        // Add delete button handlers
+        if (this.editMode) {
+            document.querySelectorAll('.delete-train-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const trainId = parseInt(e.target.closest('.train-item').dataset.id);
+                    this.deleteTrain(trainId);
+                });
+            });
+        }
     }
 
     updateLinesList() {
@@ -530,6 +726,7 @@ class RailwayManager {
             <div class="stop-item" data-id="${stop.id}">
                 <h3>${stop.name}</h3>
                 <p>Lat: ${stop.coordinates.lat.toFixed(4)}, Lng: ${stop.coordinates.lng.toFixed(4)}</p>
+                <p class="passenger-count">Waiting: ${stop.waitingPassengers.length}</p>
             </div>
         `).join('');
 
@@ -546,65 +743,101 @@ class RailwayManager {
         });
     }
 
-    updateTrainsList() {
-        const trainsList = document.getElementById('trainsList');
+    // Phase 3: Budget display
+    updateBudgetDisplay() {
+        const moneyEl = document.getElementById('money');
+        const revenueEl = document.getElementById('totalRevenue');
+        const costsEl = document.getElementById('totalCosts');
+        const profitEl = document.getElementById('profit');
 
-        if (this.trains.length === 0) {
-            trainsList.innerHTML = '<div class="empty-state">No trains yet. Add a train to start simulation.</div>';
-            return;
+        if (moneyEl) {
+            const money = this.economicSystem.getBalance();
+            moneyEl.textContent = `$${money.toFixed(2)}`;
+            moneyEl.className = money >= 0 ? 'positive' : 'negative';
         }
 
-        trainsList.innerHTML = this.trains.map(train => {
-            const scheduleInfo = train.schedule
-                ? `${train.schedule.stops.length} stops`
-                : 'No schedule';
-            const progressDisplay = train.status !== 'unscheduled'
-                ? `<p>Progress: ${(train.progress * 100).toFixed(0)}%</p>`
-                : '';
+        if (revenueEl) revenueEl.textContent = `$${this.economicSystem.totalRevenue.toFixed(2)}`;
+        if (costsEl) costsEl.textContent = `$${this.economicSystem.totalCosts.toFixed(2)}`;
+        if (profitEl) {
+            const profit = this.economicSystem.getProfit();
+            profitEl.textContent = `$${profit.toFixed(2)}`;
+            profitEl.className = profit >= 0 ? 'positive' : 'negative';
+        }
+    }
 
-            return `
-                <div class="train-item" data-id="${train.id}">
-                    <div class="train-item-content">
-                        <h3>${train.name}</h3>
-                        <p>Line: ${train.line ? train.line.name : 'Not assigned'}</p>
-                        <p>Schedule: ${scheduleInfo}</p>
-                        ${progressDisplay}
-                        <span class="status ${train.status}">${train.status}</span>
-                    </div>
-                    ${this.editMode ? '<button class="delete-train-btn">×</button>' : ''}
-                </div>
-            `;
-        }).join('');
+    // Phase 3: Update passenger counts on stop popups
+    updateStopPassengerCounts() {
+        this.stops.forEach(stop => {
+            const count = stop.waitingPassengers.length;
+            stop.layer.setPopupContent(`<b>${stop.name}</b><br>Waiting: ${count} passengers`);
+        });
+    }
 
-        // Add click handlers to zoom to trains
-        document.querySelectorAll('.train-item').forEach(item => {
-            item.addEventListener('click', (e) => {
-                // Don't zoom if clicking delete button
-                if (e.target.classList.contains('delete-train-btn')) {
-                    return;
+    // Phase 3: Passenger generation
+    updatePassengerGeneration(deltaTime) {
+        if (this.stops.length < 2) return; // Need at least 2 stops
+
+        this.stops.forEach(stop => {
+            stop.lastPassengerSpawn += deltaTime;
+
+            if (stop.lastPassengerSpawn >= this.passengerGenerationRate) {
+                // Generate a passenger
+                const destination = this.getRandomStop(stop);
+                if (destination) {
+                    const passenger = new Passenger(this.nextPassengerId++, stop, destination);
+                    stop.waitingPassengers.push(passenger);
+                    this.passengers.push(passenger);
                 }
+                stop.lastPassengerSpawn = 0;
+            }
+        });
+    }
 
-                const trainId = parseInt(e.currentTarget.dataset.id);
-                const train = this.trains.find(t => t.id === trainId);
-                if (train && train.currentPosition) {
-                    this.map.setView(train.currentPosition, 15);
-                    if (train.marker) {
-                        train.marker.openPopup();
-                    }
+    getRandomStop(excludeStop) {
+        const availableStops = this.stops.filter(s => s.id !== excludeStop.id);
+        if (availableStops.length === 0) return null;
+        return availableStops[Math.floor(Math.random() * availableStops.length)];
+    }
+
+    // Phase 3: Boarding/alighting logic
+    updatePassengerBoarding() {
+        this.trains.forEach(train => {
+            if (train.status !== 'running' || !train.schedule) return;
+
+            // Check if train is near a scheduled stop
+            train.schedule.stops.forEach(stop => {
+                const distanceToStop = train.distance(train.currentPosition, stop.coordinates);
+
+                // If within 50 meters of stop
+                if (distanceToStop < 50) {
+                    // Alight passengers
+                    const alighted = train.alightPassengers(stop);
+                    alighted.forEach(passenger => {
+                        // Calculate fare based on distance
+                        const tripDistance = train.distance(passenger.origin.coordinates, passenger.destination.coordinates);
+                        const fare = this.economicSystem.calculatePassengerFare(tripDistance);
+                        this.economicSystem.earnRevenue(fare, 'passenger');
+                    });
+
+                    // Board waiting passengers
+                    const boarded = train.boardPassengers(stop.waitingPassengers);
+                    stop.waitingPassengers = stop.waitingPassengers.filter(p => !boarded.includes(p));
                 }
             });
         });
+    }
 
-        // Add delete button handlers
-        if (this.editMode) {
-            document.querySelectorAll('.delete-train-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const trainId = parseInt(e.target.closest('.train-item').dataset.id);
-                    this.deleteTrain(trainId);
-                });
-            });
-        }
+    // Phase 3: Economic updates
+    updateEconomics(deltaSeconds) {
+        // Operating costs for running trains
+        const runningTrains = this.trains.filter(t => t.status === 'running');
+        const trainCosts = runningTrains.length * this.economicSystem.trainOperatingCostPerSec * deltaSeconds;
+
+        // Line maintenance costs
+        const lineCosts = this.lines.length * this.economicSystem.lineMaintenanceCostPerSec * deltaSeconds;
+
+        const totalCosts = trainCosts + lineCosts;
+        this.economicSystem.spendMoney(totalCosts, 'operating');
     }
 
     toggleSimulation() {
@@ -787,10 +1020,14 @@ class RailwayManager {
             this.lines = [];
             this.stops = [];
             this.trains = [];
+            this.passengers = [];
             this.colorIndex = 0;
 
             // Reset simulation
             this.simulationEngine.reset();
+
+            // Phase 3: Reset economic system
+            this.economicSystem = new EconomicSystem(50000);
 
             // Reset play button
             const btn = document.getElementById('playPauseBtn');

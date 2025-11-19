@@ -321,6 +321,47 @@ header h1 {
     transform: scale(1.1);
 }
 
+/* Phase 3: Budget Panel */
+.budget-panel {
+    background: white;
+    padding: 1rem;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    margin-bottom: 2rem;
+}
+
+.budget-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #eee;
+}
+
+.budget-row:last-child {
+    border-bottom: none;
+    font-weight: bold;
+    padding-top: 0.8rem;
+}
+
+.budget-row span:first-child {
+    color: #666;
+}
+
+.budget-row .positive {
+    color: #4CAF50;
+    font-weight: 600;
+}
+
+.budget-row .negative {
+    color: #f44336;
+    font-weight: 600;
+}
+
+.passenger-count {
+    color: #9C27B0;
+    font-weight: 600;
+}
+
 /* Custom Leaflet Draw Styles */
 .leaflet-draw-actions a {
     background-color: #fff;
