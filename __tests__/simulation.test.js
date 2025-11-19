@@ -19,7 +19,10 @@ describe('SimulationEngine Class', () => {
 
         mockRailwayManager = {
             trains: [mockTrain],
-            updateSimulationUI: jest.fn()
+            updateSimulationUI: jest.fn(),
+            updateEconomics: jest.fn(),
+            updatePassengerGeneration: jest.fn(),
+            updatePassengerBoarding: jest.fn()
         };
 
         simulationEngine = new SimulationEngine(mockRailwayManager);
